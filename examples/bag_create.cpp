@@ -263,6 +263,8 @@ int main(
 
     std::cout << "BAG created\n";
 
+    dataset->close();
+
     return EXIT_SUCCESS;
 }
 

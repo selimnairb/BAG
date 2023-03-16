@@ -21,6 +21,7 @@ constexpr int kMaxCompressionLevel = 9;
 
 //! Path names for BAG entities
 #define ROOT_PATH                       "/BAG_root"
+#define CHECKSUM_PATH                   "/BAG_checksum"
 #define METADATA_PATH                   ROOT_PATH "/metadata"
 #define ELEVATION_PATH                  ROOT_PATH "/elevation"
 #define UNCERTAINTY_PATH                ROOT_PATH "/uncertainty"

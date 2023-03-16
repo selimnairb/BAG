@@ -147,6 +147,8 @@ private:
 
     Layer& addLayer(std::shared_ptr<Layer> layer) &;
 
+    void calculateChecksum();
+
     //! Custom deleter to not require knowledge of ::H5::H5File destructor here.
     struct BAG_API DeleteH5File final {
         void operator()(::H5::H5File* ptr) noexcept;

@@ -24,12 +24,199 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
-#include <H5Cpp.h>
 #include <map>
 #include <memory>
 #include <regex>
 #include <string>
 #include <memory>
+
+#include <hdf5.h>
+#include <H5Cpp.h>
+
+/*-------------------------------------------------------------------------
+ * local typedefs for HDF5 file traversal
+ *-------------------------------------------------------------------------
+ */
+//typedef herr_t (*h5trav_obj_func_t)(const char *path_name, const H5O_info2_t *oinfo, const char *first_seen,
+//                                    void *udata);
+//typedef herr_t (*h5trav_lnk_func_t)(const char *path_name, const H5L_info2_t *linfo, void *udata);
+//
+//typedef struct trav_addr_path_t {
+//    H5O_token_t token;
+//    char       *path;
+//} trav_addr_path_t;
+//
+//typedef struct trav_addr_t {
+//    size_t            nalloc;
+//    size_t            nused;
+//    trav_addr_path_t *objs;
+//} trav_addr_t;
+//
+//typedef struct {
+//    h5trav_obj_func_t visit_obj; /* Callback for visiting objects */
+//    h5trav_lnk_func_t visit_lnk; /* Callback for visiting links */
+//    void             *udata;     /* User data to pass to callbacks */
+//} trav_visitor_t;
+//
+//typedef struct {
+//    trav_addr_t          *seen;          /* List of addresses seen already */
+//    const trav_visitor_t *visitor;       /* Information for visiting each link/object */
+//    hbool_t               is_absolute;   /* Whether the traversal has absolute paths */
+//    const char           *base_grp_name; /* Name of the group that serves as the base
+//                                          * for iteration */
+//    unsigned fields;                     /* Fields needed in H5O_info2_t struct */
+//} trav_ud_traverse_t;
+//
+//typedef struct {
+//    hid_t fid; /* File ID being traversed */
+//} trav_print_udata_t;
+
+typedef struct trav_path_op_data_t {
+    const char *path;
+} trav_path_op_data_t;
+
+/*-------------------------------------------------------------------------
+ * Function: trav_attr
+ *
+ * Purpose:  Read attributes in an HDF5 location
+ *
+ * Return:   herr_t
+ *
+ * Parts of this function adapted from https://github.com/HDFGroup/hdf5/blob/develop/tools/lib/h5trav.c
+ * Copyright by The HDF Group.
+ * All rights reserved.
+ *
+ * This file is part of HDF5.  The full HDF5 copyright notice, including
+ * terms governing use, modification, and redistribution, is contained in
+ * the COPYING file, which can be found at the root of the source code
+ * distribution tree, or in https://www.hdfgroup.org/licenses.
+ * If you do not have access to either file, you may request a copy from     
+ * help@hdfgroup.org.
+ *-------------------------------------------------------------------------
+ */
+static herr_t trav_attr(hid_t obj, const char *attr_name, const H5A_info_t *ainfo, void *_op_data) {
+    trav_path_op_data_t *op_data = (trav_path_op_data_t *)_op_data;
+    const char          *buf     = op_data->path;
+
+//    if ((strlen(buf) == 1) && (*buf == '/')) printf(" %-10s %s%s", "attribute", buf, attr_name);
+//    else
+    printf(" %-10s %s/%s", "attribute", buf, attr_name);
+
+    hid_t       attr  = H5I_INVALID_HID;
+    hid_t       space = H5I_INVALID_HID;
+    hsize_t     size[H5S_MAX_RANK];
+    int         ndims;
+    int         i;
+    H5S_class_t space_type;
+
+    if ((attr = H5Aopen(obj, attr_name, H5P_DEFAULT))) {
+        space = H5Aget_space(attr);
+
+        /* Data space */
+        ndims      = H5Sget_simple_extent_dims(space, size, NULL);
+        space_type = H5Sget_simple_extent_type(space);
+        switch (space_type) {
+            case H5S_SCALAR:
+                /* scalar dataspace */
+                printf(" scalar\n");
+                break;
+
+            case H5S_SIMPLE:
+                /* simple dataspace */
+                printf(" {");
+                for (i = 0; i < ndims; i++) {
+                    printf("%s%" PRIuHSIZE, i ? ", " : "", size[i]);
+                }
+                printf("}\n");
+                break;
+
+            case H5S_NULL:
+                /* null dataspace */
+                printf(" null\n");
+                break;
+
+            default:
+                /* Unknown dataspace type */
+                printf(" unknown\n");
+                break;
+        } /* end switch */
+
+        H5Sclose(space);
+        H5Aclose(attr);
+    }
+
+    return (0);
+}
+
+/*
+ * Define operator data structure type for H5Literate callback.
+ * During recursive iteration, these structures will form a
+ * linked list that can be searched for duplicate groups,
+ * preventing infinite recursion.
+ */
+//struct opdata {
+//    unsigned        recurs;         /* Recursion level.  0=root */
+//    struct opdata   *prev;          /* Pointer to previous opdata */
+//    haddr_t         addr;           /* Group address */
+//};
+
+/************************************************************
+  Operator function for H5Ovisit.  This function prints the
+  name and type of the object passed to it.
+ ************************************************************/
+static herr_t op_func(hid_t loc_id, const char *name, const H5O_info_t *info,
+               void *operator_data) {
+    printf("%s/", ROOT_PATH);               /* Print root group in object path */
+
+    /*
+     * Check if the current object is the root group, and if not print
+     * the full path name and type.
+     */
+//    if (name[0] == '.') {
+//        // Root group, do not print '.'
+//        printf ("  (Group)\n");
+//    } else {
+        switch (info->type) {
+            case H5O_TYPE_GROUP:
+                printf("%s  (Group)\n", name);
+                break;
+            case H5O_TYPE_DATASET:
+                printf("%s  (Dataset)\n", name);
+                break;
+            case H5O_TYPE_NAMED_DATATYPE:
+                printf("%s  (Datatype)\n", name);
+                break;
+            default:
+                printf("%s  (Unknown)\n", name);
+        }
+
+        // Traverse attributes of current object
+        trav_path_op_data_t op_data = {name};
+        H5Aiterate_by_name(loc_id, name, H5_INDEX_NAME, H5_ITER_INC, NULL, trav_attr,
+                       &op_data, H5P_DEFAULT);
+//    }
+
+    return 0;
+}
+
+/************************************************************
+  Operator function for H5Lvisit.  This function simply
+  retrieves the info for the object the current link points
+  to, and calls the operator function for H5Ovisit.
+ ************************************************************/
+//herr_t op_func_L(hid_t loc_id, const char *name, const H5L_info_t *info,
+//                  void *operator_data) {
+//    herr_t          status;
+//    H5O_info_t      infobuf;
+//
+//    /*
+//     * Get type of the object and display its name and type.
+//     * The name of the object is passed to this function by
+//     * the Library.
+//     */
+//    status = H5Oget_info_by_name(loc_id, name, &infobuf, H5O_INFO_ALL, H5P_DEFAULT);
+//    return op_func (loc_id, name, &infobuf, operator_data);
+//}
 
 
 namespace BAG {
@@ -297,8 +484,40 @@ std::shared_ptr<Dataset> Dataset::create(
     return pDataset;
 }
 
+//extern "C" herr_t op_func(hid_t loc_id, const char *name, const H5O_info_t *info,
+//                          void *operator_data);
+//extern "C" herr_t op_func_L(hid_t loc_id, const char *name, const H5L_info_t *info,
+//                             void *operator_data);
+
+void Dataset::calculateChecksum() {
+    herr_t status;
+    // Get ID of /BAG_root group
+    hid_t bag_root = H5Gopen(m_pH5file->getId(), ROOT_PATH, H5P_DEFAULT);
+    if (bag_root < 0) {
+        throw GroupNotFound{};
+    }
+    /*
+     * Begin iteration of /BAG_root using H5Ovisit
+     */
+    printf ("Objects in the file:\n");
+    status = H5Ovisit(bag_root, H5_INDEX_NAME, H5_ITER_INC, op_func,
+                      NULL, H5O_INFO_ALL);
+    /*
+     * Repeat the same process using H5Lvisit
+     */
+//    printf ("\nLinks in the file:\n");
+//    status = H5Lvisit(bag_root, H5_INDEX_NAME, H5_ITER_INC, op_func_L, NULL);
+}
+
 //! Close a BAG dataset. Closes the underlying HDF5 file.
 void Dataset::close() {
+
+    if (!m_descriptor.isReadOnly()) {
+        // Dataset is not read only, so let's traverse the contents of the /BAG_root group in the
+        // HDF5 file and calculate the SHA sum for all attributes and datasets
+        calculateChecksum();
+    }
+
     if (m_pH5file) {
         m_pH5file->close();
         m_pH5file.reset(nullptr);

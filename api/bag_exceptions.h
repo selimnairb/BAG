@@ -75,6 +75,15 @@ struct BAG_API NameRequired final : virtual std::exception
     }
 };
 
+// Dataset related.
+//! Group not found.
+    struct BAG_API GroupNotFound final : virtual std::exception
+    {
+        const char* what() const noexcept override
+        {
+            return "There is no group to work with.";
+        }
+    };
 
 // Dataset related.
 //! Layer not found.
