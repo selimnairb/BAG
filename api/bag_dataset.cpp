@@ -31,7 +31,13 @@
 #include <memory>
 
 #include <hdf5.h>
+#include <hdf5_hl.h>
 #include <H5Cpp.h>
+
+
+namespace BAG {
+
+namespace {
 
 /*-------------------------------------------------------------------------
  * local typedefs for HDF5 file traversal
@@ -90,11 +96,11 @@ typedef struct trav_path_op_data_t {
  * terms governing use, modification, and redistribution, is contained in
  * the COPYING file, which can be found at the root of the source code
  * distribution tree, or in https://www.hdfgroup.org/licenses.
- * If you do not have access to either file, you may request a copy from     
+ * If you do not have access to either file, you may request a copy from
  * help@hdfgroup.org.
  *-------------------------------------------------------------------------
  */
-static herr_t trav_attr(hid_t obj, const char *attr_name, const H5A_info_t *ainfo, void *_op_data) {
+herr_t trav_attr(hid_t obj, const char *attr_name, const H5A_info_t *ainfo, void *_op_data) {
     trav_path_op_data_t *op_data = (trav_path_op_data_t *)_op_data;
     const char          *buf     = op_data->path;
 
@@ -164,9 +170,21 @@ static herr_t trav_attr(hid_t obj, const char *attr_name, const H5A_info_t *ainf
   Operator function for H5Ovisit.  This function prints the
   name and type of the object passed to it.
  ************************************************************/
-static herr_t op_func(hid_t loc_id, const char *name, const H5O_info_t *info,
-               void *operator_data) {
+herr_t op_func(hid_t loc_id, const char *name, const H5O_info_t *info,
+                      void *operator_data) {
     printf("%s/", ROOT_PATH);               /* Print root group in object path */
+
+    hid_t dataset;
+    hid_t dataspace;
+    int rank;
+    hsize_t dims[2];
+    int status;
+
+    herr_t err;
+    H5T_class_t dtype_class;
+    size_t size;
+
+    void *buff;
 
     /*
      * Check if the current object is the root group, and if not print
@@ -176,23 +194,34 @@ static herr_t op_func(hid_t loc_id, const char *name, const H5O_info_t *info,
 //        // Root group, do not print '.'
 //        printf ("  (Group)\n");
 //    } else {
-        switch (info->type) {
-            case H5O_TYPE_GROUP:
-                printf("%s  (Group)\n", name);
-                break;
-            case H5O_TYPE_DATASET:
-                printf("%s  (Dataset)\n", name);
-                break;
-            case H5O_TYPE_NAMED_DATATYPE:
-                printf("%s  (Datatype)\n", name);
-                break;
-            default:
-                printf("%s  (Unknown)\n", name);
-        }
+    switch (info->type) {
+        case H5O_TYPE_GROUP:
+            printf("%s  (Group)\n", name);
+            break;
+        case H5O_TYPE_DATASET:
+            printf("%s  (Dataset)\n", name);
+            dataset = H5Dopen2(loc_id, name, H5P_DEFAULT);
+            dataspace = H5Dget_space(dataset);
+            rank = H5Sget_simple_extent_ndims(dataspace);
+            status = H5Sget_simple_extent_dims(dataspace, dims, NULL);
+            //                err = H5LTget_dataset_info(loc_id, name, dims, NULL, NULL);
+            size = (size_t) (dims[0] * dims[1]);
+            H5Dclose(dataset);
+            buff = malloc(size);
+            err = H5LTread_dataset(loc_id, name, info->type, buff);
+            // TODO: Calculate checksum here...
+            free(buff);
+            break;
+        case H5O_TYPE_NAMED_DATATYPE:
+            printf("%s  (Datatype)\n", name);
+            break;
+        default:
+            printf("%s  (Unknown)\n", name);
+    }
 
-        // Traverse attributes of current object
-        trav_path_op_data_t op_data = {name};
-        H5Aiterate_by_name(loc_id, name, H5_INDEX_NAME, H5_ITER_INC, NULL, trav_attr,
+    // Traverse attributes of current object
+    trav_path_op_data_t op_data = {name};
+    H5Aiterate_by_name(loc_id, name, H5_INDEX_NAME, H5_ITER_INC, NULL, trav_attr,
                        &op_data, H5P_DEFAULT);
 //    }
 
@@ -217,11 +246,6 @@ static herr_t op_func(hid_t loc_id, const char *name, const H5O_info_t *info,
 //    status = H5Oget_info_by_name(loc_id, name, &infobuf, H5O_INFO_ALL, H5P_DEFAULT);
 //    return op_func (loc_id, name, &infobuf, operator_data);
 //}
-
-
-namespace BAG {
-
-namespace {
 
 //! Find a layer by type and case-insensitive name.
 /*!

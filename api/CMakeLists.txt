@@ -129,7 +129,7 @@ target_compile_options(baglib
         $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:CXX>,$<VERSION_GREATER_EQUAL:$<CXX_COMPILER_VERSION>,19.14>>:/Zc:__cplusplus>
 )
 
-find_package(HDF5 COMPONENTS CXX REQUIRED)
+find_package(HDF5 COMPONENTS CXX C HL REQUIRED)
 find_package(LibXml2 MODULE REQUIRED)
 
 target_include_directories(baglib
@@ -149,6 +149,7 @@ if(MSVC)
         PUBLIC
             ${HDF5_hdf5_LIBRARY}
             ${HDF5_hdf5_cpp_LIBRARY}
+            ${HDF5_hdf5_hl_LIBRARIES}
         PRIVATE
             LibXml2::LibXml2
             HDF5::HDF5
@@ -203,6 +204,7 @@ else()
     target_link_libraries(baglib
         PUBLIC
             ${HDF5_LIBRARIES}
+            ${HDF5_HL_LIBRARIES}
         PRIVATE
             LibXml2::LibXml2
             ${HDF5_PRIVATE}
