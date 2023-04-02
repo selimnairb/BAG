@@ -154,6 +154,42 @@ herr_t trav_attr(hid_t obj, const char *attr_name, const H5A_info_t *ainfo, void
     return (0);
 }
 
+void read_dataset(hid_t loc_id, const char *name, const H5O_info_t *info) {
+    //printf("\t[in read_dataset]\n");
+//    hid_t dataset;
+//    hid_t dataspace;
+//    hid_t dataType;
+//    int rank;
+//    hsize_t dims[2];
+    int status;
+
+    herr_t err;
+    H5T_class_t dtype_class;
+    size_t size = 1;
+
+    void *buff;
+
+    hid_t dataset = H5Dopen2(loc_id, name, H5P_DEFAULT);
+    hid_t dataType = H5Dget_type(dataset);
+    // Get size of dataset
+    hid_t dataspace = H5Dget_space(dataset);
+    const int ndims = H5Sget_simple_extent_ndims(dataspace);
+    hsize_t dims[ndims];
+    H5Sget_simple_extent_dims(dataspace, dims, NULL);
+    for (int i = 0; i < ndims; i++) {
+        size *= (size_t) dims[i];
+    }
+    H5Dclose(dataset);
+    buff = malloc(size);
+    err = H5LTread_dataset(loc_id, name, dataType, buff);
+    if (err < 0) {
+        H5Eprint1(stderr);
+    }
+    // TODO: Calculate checksum here...
+    free(buff);
+    H5Tclose(dataType);
+}
+
 /*
  * Define operator data structure type for H5Literate callback.
  * During recursive iteration, these structures will form a
@@ -174,19 +210,6 @@ herr_t op_func(hid_t loc_id, const char *name, const H5O_info_t *info,
                       void *operator_data) {
     printf("%s/", ROOT_PATH);               /* Print root group in object path */
 
-    hid_t dataset;
-    hid_t dataspace;
-    hid_t dataType;
-    int rank;
-    hsize_t dims[2];
-    int status;
-
-    herr_t err;
-    H5T_class_t dtype_class;
-    size_t size;
-
-    void *buff;
-
     /*
      * Check if the current object is the root group, and if not print
      * the full path name and type.
@@ -200,23 +223,8 @@ herr_t op_func(hid_t loc_id, const char *name, const H5O_info_t *info,
             printf("%s  (Group)\n", name);
             break;
         case H5O_TYPE_DATASET:
-            // TODO: Put this in a function
             printf("%s  (Dataset)\n", name);
-            dataset = H5Dopen2(loc_id, name, H5P_DEFAULT);
-            dataType = H5Dget_type(dataset);
-            dataspace = H5Dget_space(dataset);
-            rank = H5Sget_simple_extent_ndims(dataspace);
-            status = H5Sget_simple_extent_dims(dataspace, dims, NULL);
-            //                err = H5LTget_dataset_info(loc_id, name, dims, NULL, NULL);
-            // TODO: This blows up for the metadata dataset, which is a string and only has one valid dimension
-            //  (length). Need to handle non-numeric (e.g., H5T_STRING and H5T_COMPOUND) datatypes differently
-            size = (size_t) (dims[0] * dims[1]);
-            H5Dclose(dataset);
-            buff = malloc(size);
-            err = H5LTread_dataset(loc_id, name, dataType, buff);
-            // TODO: Calculate checksum here...
-            free(buff);
-            H5Tclose(dataType);
+            read_dataset(loc_id, name, info);
             break;
         case H5O_TYPE_NAMED_DATATYPE:
             printf("%s  (Datatype)\n", name);
