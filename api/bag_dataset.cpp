@@ -176,6 +176,7 @@ herr_t op_func(hid_t loc_id, const char *name, const H5O_info_t *info,
 
     hid_t dataset;
     hid_t dataspace;
+    hid_t dataType;
     int rank;
     hsize_t dims[2];
     int status;
@@ -199,8 +200,10 @@ herr_t op_func(hid_t loc_id, const char *name, const H5O_info_t *info,
             printf("%s  (Group)\n", name);
             break;
         case H5O_TYPE_DATASET:
+            // TODO: Put this in a function
             printf("%s  (Dataset)\n", name);
             dataset = H5Dopen2(loc_id, name, H5P_DEFAULT);
+            dataType = H5Dget_type(dataset);
             dataspace = H5Dget_space(dataset);
             rank = H5Sget_simple_extent_ndims(dataspace);
             status = H5Sget_simple_extent_dims(dataspace, dims, NULL);
@@ -208,9 +211,10 @@ herr_t op_func(hid_t loc_id, const char *name, const H5O_info_t *info,
             size = (size_t) (dims[0] * dims[1]);
             H5Dclose(dataset);
             buff = malloc(size);
-            err = H5LTread_dataset(loc_id, name, info->type, buff);
+            err = H5LTread_dataset(loc_id, name, dataType, buff);
             // TODO: Calculate checksum here...
             free(buff);
+            H5Tclose(dataType);
             break;
         case H5O_TYPE_NAMED_DATATYPE:
             printf("%s  (Datatype)\n", name);
