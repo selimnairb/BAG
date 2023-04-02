@@ -208,6 +208,8 @@ herr_t op_func(hid_t loc_id, const char *name, const H5O_info_t *info,
             rank = H5Sget_simple_extent_ndims(dataspace);
             status = H5Sget_simple_extent_dims(dataspace, dims, NULL);
             //                err = H5LTget_dataset_info(loc_id, name, dims, NULL, NULL);
+            // TODO: This blows up for the metadata dataset, which is a string and only has one valid dimension
+            //  (length). Need to handle non-numeric (e.g., H5T_STRING and H5T_COMPOUND) datatypes differently
             size = (size_t) (dims[0] * dims[1]);
             H5Dclose(dataset);
             buff = malloc(size);
