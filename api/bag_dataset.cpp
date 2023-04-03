@@ -81,6 +81,15 @@ typedef struct trav_path_op_data_t {
     const char *path;
 } trav_path_op_data_t;
 
+
+void read_attribute(hid_t attr, hid_t dataType, hsize_t size) {
+    herr_t err;
+    void *buff = malloc(size);
+    err = H5Aread(attr, dataType, buff);
+    // TODO: Calculate checksum here...
+    free(buff);
+}
+
 /*-------------------------------------------------------------------------
  * Function: trav_attr
  *
@@ -102,52 +111,32 @@ typedef struct trav_path_op_data_t {
  */
 herr_t trav_attr(hid_t obj, const char *attr_name, const H5A_info_t *ainfo, void *_op_data) {
     trav_path_op_data_t *op_data = (trav_path_op_data_t *)_op_data;
-    const char          *buf     = op_data->path;
+    const char *buf     = op_data->path;
 
-//    if ((strlen(buf) == 1) && (*buf == '/')) printf(" %-10s %s%s", "attribute", buf, attr_name);
-//    else
-    printf(" %-10s %s/%s", "attribute", buf, attr_name);
-
-    hid_t       attr  = H5I_INVALID_HID;
-    hid_t       space = H5I_INVALID_HID;
-    hsize_t     size[H5S_MAX_RANK];
-    int         ndims;
-    int         i;
-    H5S_class_t space_type;
+    printf(" %-10s %s/%s\n", "attribute", buf, attr_name);
+    // TODO: Factor attribute name into checksum
+    hid_t attr  = H5I_INVALID_HID;
+    int i;
 
     if ((attr = H5Aopen(obj, attr_name, H5P_DEFAULT))) {
-        space = H5Aget_space(attr);
-
-        /* Data space */
-        ndims      = H5Sget_simple_extent_dims(space, size, NULL);
-        space_type = H5Sget_simple_extent_type(space);
+        hid_t dataType = H5Aget_type(attr);
+        // Get size of attribute
+        hid_t dataspace = H5Aget_space(attr);
+        hsize_t size = H5Aget_storage_size(attr);
+        H5S_class_t space_type = H5Sget_simple_extent_type(dataspace);
         switch (space_type) {
             case H5S_SCALAR:
-                /* scalar dataspace */
-                printf(" scalar\n");
-                break;
-
             case H5S_SIMPLE:
-                /* simple dataspace */
-                printf(" {");
-                for (i = 0; i < ndims; i++) {
-                    printf("%s%" PRIuHSIZE, i ? ", " : "", size[i]);
-                }
-                printf("}\n");
+                read_attribute(attr, dataType, size);
                 break;
-
             case H5S_NULL:
-                /* null dataspace */
-                printf(" null\n");
-                break;
-
             default:
-                /* Unknown dataspace type */
-                printf(" unknown\n");
+                // Attributes that are NULL or unknown won't factor into the checksum
                 break;
         } /* end switch */
 
-        H5Sclose(space);
+        H5Tclose(dataType);
+        H5Sclose(dataspace);
         H5Aclose(attr);
     }
 
@@ -155,37 +144,25 @@ herr_t trav_attr(hid_t obj, const char *attr_name, const H5A_info_t *ainfo, void
 }
 
 void read_dataset(hid_t loc_id, const char *name, const H5O_info_t *info) {
-    //printf("\t[in read_dataset]\n");
-//    hid_t dataset;
-//    hid_t dataspace;
-//    hid_t dataType;
-//    int rank;
-//    hsize_t dims[2];
-    int status;
-
     herr_t err;
-    H5T_class_t dtype_class;
     size_t size = 1;
-
-    void *buff;
 
     hid_t dataset = H5Dopen2(loc_id, name, H5P_DEFAULT);
     hid_t dataType = H5Dget_type(dataset);
     // Get size of dataset
     hid_t dataspace = H5Dget_space(dataset);
-    const int ndims = H5Sget_simple_extent_ndims(dataspace);
-    hsize_t dims[ndims];
-    H5Sget_simple_extent_dims(dataspace, dims, NULL);
+    hsize_t dims[H5S_MAX_RANK];
+    const int ndims = H5Sget_simple_extent_dims(dataspace, dims, NULL);
     for (int i = 0; i < ndims; i++) {
         size *= (size_t) dims[i];
     }
     H5Dclose(dataset);
-    buff = malloc(size);
+    void *buff = malloc(size);
     err = H5LTread_dataset(loc_id, name, dataType, buff);
     if (err < 0) {
         H5Eprint1(stderr);
     }
-    // TODO: Calculate checksum here...
+    // TODO: Calculate checksum here (factoring in data and name)...
     free(buff);
     H5Tclose(dataType);
 }
