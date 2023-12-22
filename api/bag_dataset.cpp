@@ -161,6 +161,7 @@ void read_dataset(hid_t loc_id, const char *name, const H5O_info_t *info) {
     // Here we probably want to call H5Dread_chunk
     // See: https://docs.hdfgroup.org/hdf5/develop/group___h5_d.html#gac1092a63b718ec949d6539590a914b60
     // Before we do that, we need to figure out the chunk size and number of chunks so that we can iterate...
+    //  See H5Pget_chunk(): https://docs.hdfgroup.org/hdf5/develop/group___d_c_p_l.html#ga4ef814034f601f48ab1ed6db79b4354c...
     err = H5LTread_dataset(loc_id, name, dataType, buff);
     if (err < 0) {
         H5Eprint1(stderr);
