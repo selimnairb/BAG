@@ -1,6 +1,6 @@
 [![image](https://github.com/OpenNavigationSurface/BAG/actions/workflows/testreporting.yml/badge.svg)](https://github.com/OpenNavigationSurface/BAG/actions/workflows/testreporting.yml)
 [![image](https://github.com/OpenNavigationSurface/BAG/actions/workflows/testmatrix.yml/badge.svg)](https://github.com/OpenNavigationSurface/BAG/actions/workflows/testmatrix.yml)
-[![image](https://ci.appveyor.com/api/projects/status/b4y9lmrhvhlntgo2?svg=true)](https://ci.appveyor.com/project/giumas/bag)
+[![image](https://github.com/OpenNavigationSurface/BAG/actions/workflows/testwindows.yml/badge.svg)](https://github.com/OpenNavigationSurface/BAG/actions/workflows/testwindows.yml)
 [![image](https://raw.githubusercontent.com/OpenNavigationSurface/BAG/badges/master/coverage.svg)](https://github.com/OpenNavigationSurface/BAG/actions/workflows/testreporting.yml)
 [![Documentation Status](https://readthedocs.org/projects/bag/badge/?version=stable)](https://bag.readthedocs.io/en/latest/?badge=stable)
 
@@ -33,6 +33,41 @@ Documentation for the BAG specification and library can be found [here](https://
 - [How-to Guide](https://bag.readthedocs.io/en/stable/howto-guide/index.html)
 - [C++ API Reference](https://bag.readthedocs.io/en/stable/cpp-api/index.html)
 - [Python API Reference](https://bag.readthedocs.io/en/stable/python-api/index.html)
+
+# Installing and using the BAG library
+
+The BAG library, and its dependencies, can be installed in a Conda environment
+(for example, [Anaconda](https://www.anaconda.com/download) or
+[Miniconda](https://docs.conda.io/projects/miniconda/en/latest/)).
+
+If you only want the C++ library, install 
+[libbaglib](https://anaconda.org/conda-forge/libbaglib).
+
+To install the Python bindings (along with the C++ library) install 
+[bagpy](https://anaconda.org/conda-forge/bagpy).
+
+Once installed, you can test C++ library by building the
+[BAG examples](examples/README.md) as a standalone project.
+
+> Note: You can use [FindBAG.cmake](CMakeModules/FindBAG.cmake) in your
+> own projects to locate libbaglib installed via conda.
+
+Likewise, you can run the Python tests using the Conda-provided `bagpy`
+bindings by first installing the test dependencies into your conda environment:
+```shell
+pip install -r requirements.txt
+```
+
+Then run the tests (Linux and macOS):
+```shell
+BAG_SAMPLES_PATH=./examples/sample-data python -m pytest python/test_*.py
+```
+
+Under Windows, run:
+```shell
+set BAG_SAMPLES_PATH=examples\sample-data
+python -m pytest python\test_*.py
+```
 
 # Building and using the BAG library
 
