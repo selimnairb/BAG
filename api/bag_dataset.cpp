@@ -148,27 +148,48 @@ void read_dataset(hid_t loc_id, const char *name, const H5O_info_t *info) {
     size_t size = 1;
 
     hid_t dataset = H5Dopen2(loc_id, name, H5P_DEFAULT);
-    hid_t dataType = H5Dget_type(dataset);
-    // Get size of dataset
-    hid_t dataspace = H5Dget_space(dataset);
-    hsize_t dims[H5S_MAX_RANK];
-    const int ndims = H5Sget_simple_extent_dims(dataspace, dims, NULL);
-    for (int i = 0; i < ndims; i++) {
-        size *= (size_t) dims[i];
-    }
-    H5Dclose(dataset);
-    void *buff = malloc(size);
-    // Here we probably want to call H5Dread_chunk
-    // See: https://docs.hdfgroup.org/hdf5/develop/group___h5_d.html#gac1092a63b718ec949d6539590a914b60
+//    hid_t dataType = H5Dget_type(dataset);
+//    // Get size of dataset
+//    hid_t dataspace = H5Dget_space(dataset);
+//    hsize_t dims[H5S_MAX_RANK];
+//    const int ndims = H5Sget_simple_extent_dims(dataspace, dims, NULL);
+//    for (int i = 0; i < ndims; i++) {
+//        size *= (size_t) dims[i];
+//    }
+//    H5Dclose(dataset);
+//    void *buff = malloc(size);
+//    err = H5LTread_dataset(loc_id, name, dataType, buff);
+//    if (err < 0) {
+//        H5Eprint1(stderr);
+//    }
+//    // TODO: Calculate checksum here (factoring in data and name)...
+//    free(buff);
+//    H5Tclose(dataType);
+
     // Before we do that, we need to figure out the chunk size and number of chunks so that we can iterate...
     //  See H5Pget_chunk(): https://docs.hdfgroup.org/hdf5/develop/group___d_c_p_l.html#ga4ef814034f601f48ab1ed6db79b4354c...
-    err = H5LTread_dataset(loc_id, name, dataType, buff);
-    if (err < 0) {
-        H5Eprint1(stderr);
+    hid_t cparms = H5Dget_create_plist(dataset);
+    if (H5D_CHUNKED == H5Pget_layout(cparms)) {
+        // Read chunked data from dataset
+        // Here we probably want to call H5Dread_chunk()
+        // See: https://docs.hdfgroup.org/hdf5/develop/group___h5_d.html#gac1092a63b718ec949d6539590a914b60
+        hsize_t chunk_dims[2];
+        int rank_chunk = H5Pget_chunk(cparms, 2, chunk_dims);
+
+    } else {
+        // Read un-chunked data from dataset
+        // It looks like we can use H5Dread()
+        // See: https://docs.hdfgroup.org/hdf5/develop/group___h5_d.html#title29
+        // We have to set the datatype, but let's try the appropriate raw byte type...
+        // Try to read it as H5T_NATIVE_CHAR for now
+        hid_t dataspace = H5Dget_space(dataset);
+        hsize_t dims[H5S_MAX_RANK];
+        const int ndims = H5Sget_simple_extent_dims(dataspace, dims, NULL);
+        //hid_t memspace = H5Screate_simple(rank_chunk, chunk_dims, NULL);
+
+       // H5Sclose(memspace);
     }
-    // TODO: Calculate checksum here (factoring in data and name)...
-    free(buff);
-    H5Tclose(dataType);
+
 }
 
 /*
